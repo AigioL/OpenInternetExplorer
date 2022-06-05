@@ -4,13 +4,17 @@ const string Prefix_HTTP = "http://";
 
 try
 {
-    var obj = new ScriptControl
+    var url = GetStartPage(args);
+    try
     {
-        Language = "vbscript",
-    };
-    // https://docs.microsoft.com/en-us/office/vba/api/Outlook.Application.CreateObject#example
-    const string content = $"Set Web = CreateObject(\"InternetExplorer.Application\")\r\nWeb.Visible = True\r\nWeb.Navigate \"{{0}}\"";
-    obj.ExecuteStatement(string.Format(content, GetStartPage(args)));
+        OpenInternetExplorer(url);
+    }
+    catch
+    {
+        // https://stackoverflow.com/questions/56044878/how-to-fix-an-hresult-0x8150002e-exception
+        TryKillInternetExplorer();
+        OpenInternetExplorer(url);
+    }
 }
 catch (Exception ex)
 {
@@ -28,12 +32,12 @@ static string GetStartPage(string[] args)
     if (IsHttpUrl(url, httpsOnly)) return url;
     try
     {
-        using var registryKey = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser,
-             Environment.Is64BitOperatingSystem ?
-                 RegistryView.Registry64 :
-                 RegistryView.Registry32)
-             .OpenSubKey(@"Software\Microsoft\Internet Explorer\Main");
-        url = registryKey.GetValue("Start Page")?.ToString();
+        if (Environment.Is64BitOperatingSystem)
+        {
+            url = GetStartPageByRegistry(RegistryView.Registry64);
+            if (IsHttpUrl(url, httpsOnly)) return url;
+        }
+        url = GetStartPageByRegistry(RegistryView.Registry32);
         if (IsHttpUrl(url, httpsOnly)) return url;
     }
     catch
@@ -41,6 +45,13 @@ static string GetStartPage(string[] args)
 
     }
     return "https://www.bing.com";
+}
+
+static string? GetStartPageByRegistry(RegistryView registryView)
+{
+    using var registryKey = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, registryView)
+        .OpenSubKey(@"Software\Microsoft\Internet Explorer\Main");
+    return registryKey.GetValue("Start Page")?.ToString();
 }
 
 static string? GetArgument(string[] args, int index)
@@ -65,4 +76,30 @@ static bool GetArgumentB(string[] args, int index, bool defaultValue = false)
     {
     }
     return defaultValue;
+}
+
+static void OpenInternetExplorer(string url)
+{
+    // https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/platform-apis/aa752084(v=vs.85)
+    var IE = new InternetExplorer
+    {
+        Visible = true
+    };
+    IE.Navigate(url);
+}
+
+static void TryKillInternetExplorer()
+{
+    var processes = Process.GetProcessesByName("iexplore");
+    foreach (var process in processes)
+    {
+        try
+        {
+            process.Kill();
+        }
+        catch
+        {
+
+        }
+    }
 }
