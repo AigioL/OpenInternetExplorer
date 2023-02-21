@@ -25,11 +25,24 @@ static bool IsHttpUrl([NotNullWhen(true)] string? url, bool httpsOnly = false) =
        (url.StartsWith(Prefix_HTTPS, StringComparison.OrdinalIgnoreCase) ||
              (!httpsOnly && url.StartsWith(Prefix_HTTP, StringComparison.OrdinalIgnoreCase)));
 
+static bool IsFileUrl([NotNullWhen(true)] string? url)
+{
+    try
+    {
+        return File.Exists(url!);
+    }
+    catch
+    {
+
+    }
+    return false;
+}
+
 static string GetStartPage(string[] args)
 {
     var url = GetArgument(args, 0);
     var httpsOnly = GetArgumentB(args, 1);
-    if (IsHttpUrl(url, httpsOnly)) return url;
+    if (IsHttpUrl(url, httpsOnly) || IsFileUrl(url)) return url;
     try
     {
         if (Environment.Is64BitOperatingSystem)
